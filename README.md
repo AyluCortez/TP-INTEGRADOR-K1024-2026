@@ -2,7 +2,7 @@
 
 > **Grupo:** B
 > **Integrantes:**
-> - Aylen Cortez — [aylulucortez](https://github.com/aylulucortez)
+> - Aylen Cortez — [AyluCortez](https://github.com/AyluCortez)
 
 La consigna completa está en `enunciado.pdf` y los datos provistos por la cátedra en `datos/`.
 
