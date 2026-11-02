@@ -8,7 +8,6 @@ using namespace std;
 
 const float TASA_COMISION = 0.10f; // la comision de cada venta es el 10% de lo vendido
 const int K = 5;                   // mismo corrimiento que en normalizacion.cpp
-const int MAX_COMANDAS = 2000;
 
 struct Producto
 {
@@ -317,12 +316,17 @@ void ordenarPlanilla(char nombrePlanilla[])
     {
         return;
     }
-    Comanda comandas[MAX_COMANDAS];
+
+    // Antes de cargarla cuento cuantas ventas tiene (tamanio del archivo / tamanio
+    // de una venta) y pido memoria justa para todas: asi no hay un maximo fijo.
+    fseek(archivo, 0, SEEK_END);
+    int total = ftell(archivo) / sizeof(Comanda);
+    fseek(archivo, 0, SEEK_SET);
+
+    Comanda *comandas = new Comanda[total];
     int cantidad = 0;
-    Comanda aux;
-    while (fread(&aux, sizeof(Comanda), 1, archivo) == 1 && cantidad < MAX_COMANDAS)
+    while (cantidad < total && fread(&comandas[cantidad], sizeof(Comanda), 1, archivo) == 1)
     {
-        comandas[cantidad] = aux;
         cantidad++;
     }
     fclose(archivo);
@@ -342,6 +346,7 @@ void ordenarPlanilla(char nombrePlanilla[])
     archivo = fopen(nombrePlanilla, "wb");
     fwrite(comandas, sizeof(Comanda), cantidad, archivo);
     fclose(archivo);
+    delete[] comandas; // libero la memoria pedida con new
     cout << "Planilla " << nombrePlanilla << " ordenada por mozo (" << cantidad << " ventas)." << endl;
 }
 
