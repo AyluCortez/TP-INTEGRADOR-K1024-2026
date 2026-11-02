@@ -6,9 +6,6 @@ using namespace std;
 // Lee: comandas_historicas.dat, inventario.dat
 // Genera: mozos.dat, comandas_dd-mm-aaaa.dat (uno por dia), inventario.dat (actualizado)
 
-const int MAX_COMANDAS = 2000;
-const int MAX_MOZOS = 100;
-const int MAX_FECHAS = 100;
 const int K = 5; // corrimiento para guardar las claves
 
 struct ComandaHistorica
@@ -83,7 +80,9 @@ void numeroATexto(int numero, char texto[])
 
 // ---------------- Lectura del historico ----------------
 
-int cargarHistoricas(ComandaHistorica historicas[])
+// Cuenta cuantas comandas tiene el historico sin leerlas:
+// tamanio del archivo / tamanio de una comanda. Devuelve -1 si no existe.
+int contarHistoricas()
 {
     FILE *archivo = fopen("comandas_historicas.dat", "rb");
     if (archivo == NULL)
@@ -91,12 +90,24 @@ int cargarHistoricas(ComandaHistorica historicas[])
         cout << "No se pudo abrir comandas_historicas.dat" << endl;
         return -1;
     }
+    fseek(archivo, 0, SEEK_END);
+    int total = ftell(archivo) / sizeof(ComandaHistorica);
+    fclose(archivo);
+    return total;
+}
+
+// Carga todo el historico en el arreglo, que ya tiene lugar para "total" comandas
+int cargarHistoricas(ComandaHistorica historicas[], int total)
+{
+    FILE *archivo = fopen("comandas_historicas.dat", "rb");
+    if (archivo == NULL)
+    {
+        return 0;
+    }
 
     int cantidad = 0;
-    ComandaHistorica aux;
-    while (fread(&aux, sizeof(ComandaHistorica), 1, archivo) == 1 && cantidad < MAX_COMANDAS)
+    while (cantidad < total && fread(&historicas[cantidad], sizeof(ComandaHistorica), 1, archivo) == 1)
     {
-        historicas[cantidad] = aux;
         cantidad++;
     }
     fclose(archivo);
@@ -128,11 +139,6 @@ int armarMozos(ComandaHistorica historicas[], int cantidadHistoricas, Mozo mozos
         int pos = buscarMozoPorNombre(mozos, cantidadMozos, historicas[i].nombreMozo);
         if (pos == -1)
         {
-            if (cantidadMozos == MAX_MOZOS)
-            {
-                cout << "Se supero la cantidad maxima de mozos" << endl;
-                return cantidadMozos;
-            }
             Mozo nuevo;
             nuevo.idMozo = cantidadMozos + 1;
             strcpy(nuevo.nombre, historicas[i].nombreMozo);
@@ -203,23 +209,26 @@ void ordenarPorMozo(Comanda comandas[], int cantidad)
 
 void armarPlanillasPorDia(ComandaHistorica historicas[], int cantidadHistoricas, Mozo mozos[], int cantidadMozos)
 {
-    // primero junto las fechas distintas
-    char fechas[MAX_FECHAS][11];
+    // primero junto las fechas distintas.
+    // Como mucho hay una fecha distinta por comanda: pido ese lugar.
+    char (*fechas)[11] = new char[cantidadHistoricas][11];
     int cantidadFechas = 0;
     for (int i = 0; i < cantidadHistoricas; i++)
     {
-        if (!fechaYaEsta(fechas, cantidadFechas, historicas[i].fecha) && cantidadFechas < MAX_FECHAS)
+        if (!fechaYaEsta(fechas, cantidadFechas, historicas[i].fecha))
         {
             strcpy(fechas[cantidadFechas], historicas[i].fecha);
             cantidadFechas++;
         }
     }
 
+    // Un dia tiene como mucho todas las comandas: reuso este arreglo para cada dia
+    Comanda *delDia = new Comanda[cantidadHistoricas];
+
     cout << "\nPlanillas por dia:" << endl;
     // por cada fecha: junto sus ventas, cambio nombre por id, ordeno y grabo
     for (int f = 0; f < cantidadFechas; f++)
     {
-        Comanda delDia[MAX_COMANDAS];
         int cantidadDelDia = 0;
         for (int i = 0; i < cantidadHistoricas; i++)
         {
@@ -252,6 +261,9 @@ void armarPlanillasPorDia(ComandaHistorica historicas[], int cantidadHistoricas,
             cout << "  " << nombreArchivo << " (" << cantidadDelDia << " ventas)" << endl;
         }
     }
+
+    delete[] delDia;
+    delete[] fechas;
 }
 
 // ---------------- Stock ----------------
@@ -331,15 +343,19 @@ void actualizarStock(ComandaHistorica historicas[], int cantidadHistoricas)
 
 int main()
 {
-    ComandaHistorica historicas[MAX_COMANDAS];
-    int cantidadHistoricas = cargarHistoricas(historicas);
-    if (cantidadHistoricas == -1)
+    // Primero cuento las comandas y despues pido memoria justa para todas:
+    // asi no hay un maximo fijo.
+    int total = contarHistoricas();
+    if (total == -1)
     {
         return 1;
     }
+    ComandaHistorica *historicas = new ComandaHistorica[total];
+    int cantidadHistoricas = cargarHistoricas(historicas, total);
     cout << "Se leyeron " << cantidadHistoricas << " comandas historicas." << endl;
 
-    Mozo mozos[MAX_MOZOS];
+    // Como mucho hay un mozo distinto por comanda
+    Mozo *mozos = new Mozo[cantidadHistoricas];
     int cantidadMozos = armarMozos(historicas, cantidadHistoricas, mozos);
     guardarMozos(mozos, cantidadMozos);
 
@@ -347,5 +363,7 @@ int main()
 
     actualizarStock(historicas, cantidadHistoricas);
 
+    delete[] mozos;
+    delete[] historicas;
     return 0;
 }
